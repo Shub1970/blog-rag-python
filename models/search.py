@@ -18,6 +18,14 @@ class ResponseData(BaseModel):
     enough_context: bool
 
 
+class AiResponseData(BaseModel):
+    thought_process: List[str]
+    answer: str
+    enough_context: bool
+    recomendant_blog_id: str
+    recomendant_product_name: str
+
+
 class SearchResponse(BaseModel):
     message: str
     results: List[Context]

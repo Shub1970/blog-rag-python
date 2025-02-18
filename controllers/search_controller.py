@@ -1,5 +1,5 @@
 from database.queries import perform_similarity_search
-from models.search import Context, ResponseData
+from models.search import Context, ResponseData, AiResponseData
 from typing import List
 import os
 from fastapi import HTTPException
@@ -33,21 +33,21 @@ class SearchController:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             query_embedding = await SearchController.generate_embedding(query)
             vector_string = f"[{','.join(map(str, query_embedding))}]"
-            return await perform_similarity_search(db, vector_string)
+            return await perform_similarity_search(db, vector_string, limit=2)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
     @staticmethod
-    async def generate_ai_response(query: str, db) -> ResponseData:
+    async def generate_ai_response(query: str, db) -> AiResponseData:
         try:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
             # Generate embedding and get context
             query_embedding = await SearchController.generate_embedding(query)
             vector_string = f"[{','.join(map(str, query_embedding))}]"
-            context = await perform_similarity_search(db, vector_string)
+            context = await perform_similarity_search(db, vector_string, 5)
 
-            if not context or all(c.similarity > 0.8 for c in context):
+            if not context or all(c.similarity > 0.8 for c in context[0:2]):
                 return INSUFFICIENT_CONTEXT_RESPONSE
 
             system_prompt = """
@@ -81,7 +81,13 @@ class SearchController:
                 raise HTTPException(
                     status_code=500, detail="No content returned from OpenAI")
 
+            recomendant_blog_id = []
+            for blog in context:
+                recomendant_blog_id.append(blog.documentid)
+
             response_data = ResponseData.parse_raw(content)
+
+            response_data["recomendant_blog_id"] = recomendant_blog_id
 
             if not response_data.enough_context:
                 return INSUFFICIENT_CONTEXT_RESPONSE
